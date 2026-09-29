@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parse, diff, formatPath } from '../diff.js';
+import '../diff.js';
+
+const { parse, diff, formatPath } = globalThis.JsonDiff;
 
 const run = (a, b) => diff(parse(a), parse(b)).map((d) => `${d.kind} ${formatPath(d.path)}`);
 

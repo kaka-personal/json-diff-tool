@@ -1,4 +1,6 @@
 // JSON parser that keeps source offsets, plus a structural diff between two parsed trees.
+// Plain script (no ES module) so the page also works when opened from file://.
+(function () {
 
 const STRING_RE = /"(?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"/y;
 const NUMBER_RE = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
@@ -6,7 +8,7 @@ const NUMBER_RE = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
 // Returns null for blank input, otherwise the root node.
 // Node: { type, start, end, value?, items?, members? }
 // Object members: [{ key, keyStart, node }] (duplicate keys: last one wins, like JSON.parse).
-export function parse(text) {
+function parse(text) {
   let i = 0;
   const n = text.length;
 
@@ -139,7 +141,7 @@ function canon(node) {
 
 const IDENT_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
-export function formatPath(path) {
+function formatPath(path) {
   let s = '$';
   for (const p of path) {
     if (typeof p === 'number') s += `[${p}]`;
@@ -180,7 +182,7 @@ const slot = (node, from = node.start) => ({ node, from, to: node.end });
 
 // Returns a list of { kind: 'added' | 'removed' | 'changed', path, left, right }.
 // left/right are slots; for added/removed the missing side is the containing slot on that side (anchor).
-export function diff(leftRoot, rightRoot) {
+function diff(leftRoot, rightRoot) {
   const out = [];
 
   function walk(a, b, path) {
@@ -230,3 +232,6 @@ export function diff(leftRoot, rightRoot) {
   if (leftRoot && rightRoot) walk(slot(leftRoot), slot(rightRoot), []);
   return out;
 }
+
+globalThis.JsonDiff = { parse, diff, formatPath };
+})();

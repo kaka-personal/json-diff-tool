@@ -1,4 +1,5 @@
-import { parse, diff, formatPath } from './diff.js';
+(function () {
+const { parse, diff, formatPath } = globalThis.JsonDiff;
 
 const LINE_HEIGHT = 20;
 
@@ -202,3 +203,4 @@ document.addEventListener('keydown', (e) => {
 panes.left.textarea.value = JSON.stringify(EXAMPLE_LEFT, null, 2);
 panes.right.textarea.value = JSON.stringify(EXAMPLE_RIGHT, null, 2);
 compare();
+})();
