@@ -11,12 +11,22 @@
   <header class="topbar">
     <h1>JSON Diff Tool</h1>
     <span class="tagline">Everything runs in your browser. Nothing is uploaded.</span>
+    <button type="button" id="share" class="share" title="Copy a link that contains both documents">Share</button>
   </header>
 
   <main class="workspace">
     <section class="pane" data-side="left">
       <div class="pane-head">
         <span class="pane-title">Original</span>
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" data-mode="text" aria-pressed="true">Text</button>
+          <button type="button" data-mode="tree" aria-pressed="false">Tree</button>
+        </div>
+        <span class="tree-tools" hidden>
+          <button type="button" class="tool" data-action="expand" title="Expand all">Expand</button>
+          <button type="button" class="tool" data-action="collapse" title="Collapse all">Collapse</button>
+        </span>
+        <button type="button" class="tool" data-action="repair" title="Fix common mistakes and format">Repair</button>
         <span class="pane-status" data-role="status"></span>
       </div>
       <div class="editor">
@@ -26,6 +36,7 @@
           <textarea spellcheck="false" wrap="off" autocomplete="off" aria-label="Original JSON"></textarea>
         </div>
       </div>
+      <div class="tree" hidden></div>
     </section>
 
     <aside class="middle">
@@ -46,6 +57,15 @@
     <section class="pane" data-side="right">
       <div class="pane-head">
         <span class="pane-title">Modified</span>
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" data-mode="text" aria-pressed="true">Text</button>
+          <button type="button" data-mode="tree" aria-pressed="false">Tree</button>
+        </div>
+        <span class="tree-tools" hidden>
+          <button type="button" class="tool" data-action="expand" title="Expand all">Expand</button>
+          <button type="button" class="tool" data-action="collapse" title="Collapse all">Collapse</button>
+        </span>
+        <button type="button" class="tool" data-action="repair" title="Fix common mistakes and format">Repair</button>
         <span class="pane-status" data-role="status"></span>
       </div>
       <div class="editor">
@@ -55,10 +75,15 @@
           <textarea spellcheck="false" wrap="off" autocomplete="off" aria-label="Modified JSON"></textarea>
         </div>
       </div>
+      <div class="tree" hidden></div>
     </section>
   </main>
 
+  <div class="toast" id="toast" role="status" hidden></div>
+
   <script src="diff.js"></script>
+  <script src="text-tools.js"></script>
+  <script src="tree.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
