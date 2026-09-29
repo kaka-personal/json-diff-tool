@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JSON Diff Tool</title>
+  <meta name="description" content="Compare two JSON documents side by side and highlight what was added, removed or changed. Runs entirely in your browser.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>JSON Diff Tool</h1>
+    <span class="tagline">Everything runs in your browser. Nothing is uploaded.</span>
+  </header>
+
+  <main class="workspace">
+    <section class="pane" data-side="left">
+      <div class="pane-head">
+        <span class="pane-title">Original</span>
+        <span class="pane-status" data-role="status"></span>
+      </div>
+      <div class="editor">
+        <div class="gutter" aria-hidden="true"><div class="gutter-inner"></div></div>
+        <div class="code">
+          <div class="backdrop" aria-hidden="true"><div class="backdrop-inner"></div></div>
+          <textarea spellcheck="false" wrap="off" autocomplete="off" aria-label="Original JSON"></textarea>
+        </div>
+      </div>
+    </section>
+
+    <aside class="middle">
+      <div class="summary" id="summary">No differences</div>
+      <div class="nav">
+        <button type="button" id="prev" title="Previous difference (Alt+Up)" aria-label="Previous difference">&#8593;</button>
+        <span id="position">0 / 0</span>
+        <button type="button" id="next" title="Next difference (Alt+Down)" aria-label="Next difference">&#8595;</button>
+      </div>
+      <div class="current-path" id="current-path"></div>
+      <ul class="legend">
+        <li><i class="swatch removed"></i>Removed</li>
+        <li><i class="swatch added"></i>Added</li>
+        <li><i class="swatch changed"></i>Changed</li>
+      </ul>
+    </aside>
+
+    <section class="pane" data-side="right">
+      <div class="pane-head">
+        <span class="pane-title">Modified</span>
+        <span class="pane-status" data-role="status"></span>
+      </div>
+      <div class="editor">
+        <div class="gutter" aria-hidden="true"><div class="gutter-inner"></div></div>
+        <div class="code">
+          <div class="backdrop" aria-hidden="true"><div class="backdrop-inner"></div></div>
+          <textarea spellcheck="false" wrap="off" autocomplete="off" aria-label="Modified JSON"></textarea>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
