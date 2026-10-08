@@ -1,6 +1,5 @@
 (function () {
 const { parse, diff, formatPath } = globalThis.JsonDiff;
-const { tokenize, repair } = globalThis.JsonText;
 const { createTree } = globalThis.JsonTree;
 
 const LINE_HEIGHT = 20;
@@ -65,7 +64,6 @@ function setupPane(side) {
   });
   pane.textarea.addEventListener('scroll', () => syncScroll(pane));
   pane.modeButtons.forEach((b) => b.addEventListener('click', () => setMode(pane, b.dataset.mode)));
-  root.querySelector('[data-action="repair"]').addEventListener('click', () => repairPane(pane));
   root.querySelector('[data-action="expand"]').addEventListener('click', () => pane.tree && pane.tree.setAll(true));
   root.querySelector('[data-action="collapse"]').addEventListener('click', () => pane.tree && pane.tree.setAll(false));
   return pane;
@@ -95,44 +93,16 @@ function toast(message) {
   toastTimer = setTimeout(() => { ui.toast.hidden = true; }, 3000);
 }
 
-// Replaces the textarea content while keeping it on the browser's undo stack where supported.
-function replaceText(textarea, value) {
-  if (!textarea.offsetParent) {
-    textarea.value = value;
-    return;
-  }
-  textarea.focus();
-  textarea.select();
-  if (!document.execCommand('insertText', false, value)) textarea.value = value;
-}
-
-function repairPane(pane) {
-  const before = pane.textarea.value;
-  const result = repair(before);
-  if (!result.ok) {
-    toast(`Could not repair: ${result.error}`);
-    return;
-  }
-  if (result.text === before) {
-    toast('Already valid and formatted');
-    return;
-  }
-  replaceText(pane.textarea, result.text);
-  clearSharedHash();
-  compare();
-  toast('Repaired and formatted');
-}
-
 // Only the visible lines (plus a buffer) of the backdrop and gutter are rendered, so cost does not grow with document size.
 const BUFFER_LINES = 50;
 function syncScroll(pane) {
-  if (pane.mode !== 'text' || !pane.tokens) return;
+  if (pane.mode !== 'text' || !pane.marks) return;
   const { textarea: ta, text, starts } = pane;
   const first = Math.max(0, Math.floor(ta.scrollTop / LINE_HEIGHT) - BUFFER_LINES);
   const last = Math.min(starts.length - 1, Math.ceil((ta.scrollTop + ta.clientHeight) / LINE_HEIGHT) + BUFFER_LINES);
   const from = starts[first];
   const to = last + 1 < starts.length ? starts[last + 1] : text.length;
-  pane.backdrop.innerHTML = highlightHtml(text, pane.tokens, pane.marks, from, to);
+  pane.backdrop.innerHTML = marksHtml(text, pane.marks, from, to);
   let gutter = '';
   for (let l = first; l <= last; l++) gutter += `<span class="${pane.lineCls[l]}">${l + 1}</span>`;
   pane.gutter.innerHTML = gutter;
@@ -189,35 +159,13 @@ function marksFor(pane) {
   return marks.sort((a, b) => a.from - b.from);
 }
 
-// Syntax-highlighted HTML for text[from, to) with diff marks wrapped around token spans.
-function highlightHtml(text, tokens, marks, from, to) {
+// Backdrop HTML for text[from, to) with diff marks.
+function marksHtml(text, marks, from, to) {
   let html = '';
   let pos = from;
-  let lo = 0;
-  let hi = tokens.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (tokens[mid].end <= from) lo = mid + 1;
-    else hi = mid;
-  }
-  let ti = lo;
-  const emit = (to) => {
-    while (pos < to) {
-      while (ti < tokens.length && tokens[ti].end <= pos) ti++;
-      const t = tokens[ti];
-      if (!t || t.start >= to) {
-        html += escapeHtml(text.slice(pos, to));
-        pos = to;
-        return;
-      }
-      if (t.start > pos) {
-        html += escapeHtml(text.slice(pos, t.start));
-        pos = t.start;
-      }
-      const end = Math.min(t.end, to);
-      html += `<span class="t-${t.type}">${escapeHtml(text.slice(pos, end))}</span>`;
-      pos = end;
-    }
+  const emit = (end) => {
+    html += escapeHtml(text.slice(pos, end));
+    pos = end;
   };
   for (const m of marks) {
     if (m.to <= from) continue;
@@ -260,7 +208,7 @@ function renderTree(pane) {
     pane.treeBox.replaceChildren();
     const msg = document.createElement('p');
     msg.className = 'tree-empty';
-    msg.textContent = pane.error ? 'Invalid JSON. Switch to Text to fix it, or use Repair.' : 'Empty';
+    msg.textContent = pane.error ? 'Invalid JSON. Switch to Text to fix it.' : 'Empty';
     pane.treeBox.append(msg);
     return;
   }
@@ -289,7 +237,6 @@ function renderPane(pane) {
       const last = lineOf(starts, Math.max(m.from, m.to - 1));
       for (let l = lineOf(starts, m.from); l <= last; l++) lineCls[l] = m.cls;
     }
-    pane.tokens = tokenize(text);
     pane.marks = marks;
     pane.lineCls = lineCls;
   } else {

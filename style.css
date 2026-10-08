@@ -15,11 +15,6 @@
   --changed: rgba(212, 167, 44, 0.3);
   --changed-strong: #bf8700;
   --error: rgba(207, 34, 46, 0.45);
-  --tok-key: #0550ae;
-  --tok-str: #0a3069;
-  --tok-num: #953800;
-  --tok-lit: #8250df;
-  --tok-punc: #656d76;
   --line: 20px;
   --pad: 8px;
   --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
@@ -44,12 +39,7 @@
     --changed: rgba(210, 153, 34, 0.3);
     --changed-strong: #d29922;
     --error: rgba(248, 81, 73, 0.5);
-    --tok-key: #79c0ff;
-    --tok-str: #a5d6ff;
-    --tok-num: #ffa657;
-    --tok-lit: #d2a8ff;
-    --tok-punc: #8d96a0;
-    color-scheme: dark;
+              color-scheme: dark;
   }
 }
 
@@ -191,7 +181,7 @@ textarea {
   white-space: pre;
   overflow: auto;
   background: transparent;
-  color: transparent;
+  color: var(--text);
   caret-color: var(--text);
 }
 
@@ -234,13 +224,7 @@ textarea {
 .swatch.removed { background: var(--removed-strong); }
 .swatch.changed { background: var(--changed-strong); }
 
-textarea::selection { background: rgba(59, 111, 212, 0.3); }
-
-.t-key { color: var(--tok-key); }
-.t-str { color: var(--tok-str); }
-.t-num { color: var(--tok-num); }
-.t-lit { color: var(--tok-lit); }
-.t-punc, .t-index, .count { color: var(--tok-punc); }
+.tree .muted { color: var(--muted); }
 
 .tree {
   flex: 1;

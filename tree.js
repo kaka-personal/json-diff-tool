@@ -13,8 +13,6 @@ function valueText(node) {
   return node.type === 'string' ? JSON.stringify(node.value) : String(node.value);
 }
 
-const TYPE_CLASS = { string: 't-str', number: 't-num', boolean: 't-lit', null: 't-lit' };
-
 // kinds: Map(node -> 'added' | 'removed' | 'changed'); dirty: Set of nodes that contain a diff.
 function createTree(container, root, kinds, dirty) {
   const rows = new Map();
@@ -32,7 +30,7 @@ function createTree(container, root, kinds, dirty) {
 
   function label(row, key, isIndex) {
     if (key === undefined) return;
-    row.append(el('span', isIndex ? 't-index' : 't-key', isIndex ? String(key) : JSON.stringify(key)), el('span', 't-punc', ': '));
+    row.append(el('span', isIndex ? 'muted' : '', isIndex ? String(key) : JSON.stringify(key)), el('span', 'muted', ': '));
   }
 
   function render(node, key, isIndex, depth) {
@@ -40,7 +38,7 @@ function createTree(container, root, kinds, dirty) {
     if (node.type !== 'object' && node.type !== 'array') {
       const row = el('div', 'row leaf');
       label(row, key, isIndex);
-      row.append(el('span', TYPE_CLASS[node.type], valueText(node)));
+      row.append(el('span', '', valueText(node)));
       if (kind) row.classList.add(kind);
       rows.set(node, row);
       return row;
@@ -50,7 +48,7 @@ function createTree(container, root, kinds, dirty) {
     const details = el('details', 'branch');
     const summary = el('summary', 'row');
     label(summary, key, isIndex);
-    summary.append(el('span', 't-punc', isObj ? '{' : '['), el('span', 'count', ` ${count} ${isObj ? 'keys' : 'items'} `), el('span', 't-punc', isObj ? '}' : ']'));
+    summary.append(el('span', 'muted', `${isObj ? '{' : '['} ${count} ${isObj ? 'keys' : 'items'} ${isObj ? '}' : ']'}`));
     if (kind) summary.classList.add(kind);
     if (dirty.has(node)) summary.classList.add('dirty');
     details.append(summary);
