@@ -1,10 +1,13 @@
 (function () {
-const { parse, diff, format, formatPath } = globalThis.JsonDiff;
+const { parse, diff, format, formatPath, toPatch } = globalThis.JsonDiff;
+const { tokenize, repair } = globalThis.JsonText;
 const { createTree } = globalThis.JsonTree;
 
 const LINE_HEIGHT = 20;
 // Below this size every keystroke is compared on the next frame; larger documents are debounced.
 const INSTANT_LIMIT = 100000;
+// Above this size editor content is replaced without the native undo stack, which gets slow on huge inputs.
+const UNDO_LIMIT = 2000000;
 
 const EXAMPLE_LEFT = {
   name: 'json-diff-tool',
@@ -24,6 +27,12 @@ const EXAMPLE_RIGHT = {
   license: 'MIT',
 };
 
+let diffs = [];
+let current = -1;
+let timer = 0;
+let frame = 0;
+let wrap = false;
+
 const panes = { left: setupPane('left'), right: setupPane('right') };
 const ui = {
   summary: document.getElementById('summary'),
@@ -33,13 +42,14 @@ const ui = {
   next: document.getElementById('next'),
   share: document.getElementById('share'),
   indent: document.getElementById('indent'),
+  wrap: document.getElementById('wrap'),
+  ignoreOrder: document.getElementById('ignore-order'),
+  ignoreKeys: document.getElementById('ignore-keys'),
+  patch: document.getElementById('patch'),
   toast: document.getElementById('toast'),
 };
 
-let diffs = [];
-let current = -1;
-let timer = 0;
-let frame = 0;
+const hasFiles = (e) => !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files');
 
 function setupPane(side) {
   const root = document.querySelector(`.pane[data-side="${side}"]`);
@@ -70,6 +80,28 @@ function setupPane(side) {
   root.querySelector('[data-action="collapse"]').addEventListener('click', () => pane.tree && pane.tree.setAll(false));
   root.querySelector('[data-action="format"]').addEventListener('click', () => reformat(pane, indentUnit()));
   root.querySelector('[data-action="minify"]').addEventListener('click', () => reformat(pane, ''));
+  root.querySelector('[data-action="repair"]').addEventListener('click', () => repairPane(pane));
+
+  const fileInput = root.querySelector('input[type="file"]');
+  root.querySelector('[data-action="open"]').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    loadFile(pane, fileInput.files[0]);
+    fileInput.value = '';
+  });
+  root.addEventListener('dragover', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    root.classList.add('drop');
+  });
+  root.addEventListener('dragleave', (e) => {
+    if (!root.contains(e.relatedTarget)) root.classList.remove('drop');
+  });
+  root.addEventListener('drop', (e) => {
+    root.classList.remove('drop');
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    loadFile(pane, e.dataTransfer.files[0]);
+  });
   return pane;
 }
 
@@ -89,27 +121,68 @@ function setMode(pane, mode) {
   renderPane(pane);
 }
 
+const stored = (key) => {
+  try { return localStorage.getItem(key); } catch { return null; }
+};
+const store = (key, value) => {
+  try { localStorage.setItem(key, value); } catch {}
+};
+
 const indentUnit = () => (ui.indent.value === 'tab' ? '\t' : ' '.repeat(Number(ui.indent.value)));
+
+// Replaces the editor content. insertText keeps the change on the native undo stack; hidden or very large
+// editors, and browsers without insertText, get a plain assignment instead.
+function replaceText(pane, value) {
+  const ta = pane.textarea;
+  let done = false;
+  if (ta.offsetParent && value.length < UNDO_LIMIT) {
+    ta.focus();
+    ta.select();
+    done = document.execCommand('insertText', false, value);
+  }
+  if (!done) {
+    ta.value = value;
+    ta.dispatchEvent(new Event('input'));
+  }
+  ta.setSelectionRange(0, 0);
+  ta.scrollTop = ta.scrollLeft = 0;
+}
 
 function reformat(pane, indent) {
   const ta = pane.textarea;
   try {
     if (!parse(ta.value)) return;
   } catch {
-    toast('Fix the invalid JSON before formatting');
+    toast('Fix the invalid JSON before formatting, or use Repair');
     return;
   }
   const text = format(ta.value, indent);
-  if (text === ta.value) return;
-  // insertText keeps the change on the native undo stack; fall back to a plain assignment where it is unsupported.
-  ta.focus();
-  ta.select();
-  if (!document.execCommand('insertText', false, text)) {
-    ta.value = text;
-    ta.dispatchEvent(new Event('input'));
+  if (text !== ta.value) replaceText(pane, text);
+}
+
+function repairPane(pane) {
+  const before = pane.textarea.value;
+  const result = repair(before);
+  if (!result.ok) {
+    toast(`Could not repair: ${result.error}`);
+    return;
   }
-  ta.setSelectionRange(0, 0);
-  ta.scrollTop = ta.scrollLeft = 0;
+  const text = format(result.text, indentUnit());
+  if (text === before) {
+    toast('Already valid and formatted');
+    return;
+  }
+  replaceText(pane, text);
+  toast('Repaired and formatted');
+}
+
+async function loadFile(pane, file) {
+  if (!file) return;
+  try {
+    replaceText(pane, await file.text());
+  } catch {
+    toast(`Could not read ${file.name}`);
+  }
 }
 
 let toastTimer = 0;
@@ -121,21 +194,43 @@ function toast(message) {
 }
 
 // Only the visible lines (plus a buffer) of the backdrop and gutter are rendered, so cost does not grow with document size.
+// Wrapped lines have no fixed height, so with wrapping on the whole document is rendered once and only moved on scroll.
 const BUFFER_LINES = 50;
 function syncScroll(pane) {
   if (pane.mode !== 'text' || !pane.marks) return;
   const { textarea: ta, text, starts } = pane;
+  if (wrap) {
+    if (!pane.wrapped) {
+      pane.backdrop.innerHTML = wrappedHtml(pane);
+      pane.wrapped = true;
+    }
+    pane.backdrop.style.width = `${ta.clientWidth}px`;
+    pane.backdrop.style.transform = `translateY(${-ta.scrollTop}px)`;
+    return;
+  }
   const first = Math.max(0, Math.floor(ta.scrollTop / LINE_HEIGHT) - BUFFER_LINES);
   const last = Math.min(starts.length - 1, Math.ceil((ta.scrollTop + ta.clientHeight) / LINE_HEIGHT) + BUFFER_LINES);
   const from = starts[first];
   const to = last + 1 < starts.length ? starts[last + 1] : text.length;
-  pane.backdrop.innerHTML = marksHtml(text, pane.marks, from, to);
+  pane.backdrop.innerHTML = highlightHtml(text, pane.tokens, pane.marks, from, to);
   let gutter = '';
   for (let l = first; l <= last; l++) gutter += `<span class="${pane.lineCls[l]}">${l + 1}</span>`;
   pane.gutter.innerHTML = gutter;
   const y = first * LINE_HEIGHT - ta.scrollTop;
+  pane.backdrop.style.width = '';
   pane.backdrop.style.transform = `translate(${-ta.scrollLeft}px, ${y}px)`;
   pane.gutter.style.transform = `translateY(${y}px)`;
+}
+
+// One block per line, carrying its line number, so wrapped lines and their numbers stay aligned.
+function wrappedHtml(pane) {
+  const { text, starts, tokens, marks, lineCls } = pane;
+  let html = '';
+  for (let l = 0; l < starts.length; l++) {
+    const end = l + 1 < starts.length ? starts[l + 1] - 1 : text.length;
+    html += `<div class="ln ${lineCls[l]}" data-n="${l + 1}">${highlightHtml(text, tokens, marks, starts[l], end)}</div>`;
+  }
+  return html;
 }
 
 function lineStarts(text) {
@@ -151,6 +246,18 @@ function lineOf(starts, offset) {
     const mid = (lo + hi + 1) >> 1;
     if (starts[mid] <= offset) lo = mid;
     else hi = mid - 1;
+  }
+  return lo;
+}
+
+// Index of the first range in a sorted, non-overlapping list that ends after offset.
+function firstEndingAfter(list, offset, end) {
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid][end] <= offset) lo = mid + 1;
+    else hi = mid;
   }
   return lo;
 }
@@ -186,16 +293,31 @@ function marksFor(pane) {
   return marks.sort((a, b) => a.from - b.from);
 }
 
-// Backdrop HTML for text[from, to) with diff marks.
-function marksHtml(text, marks, from, to) {
+// Syntax-highlighted HTML for text[from, to) with diff marks wrapped around token spans.
+function highlightHtml(text, tokens, marks, from, to) {
   let html = '';
   let pos = from;
-  const emit = (end) => {
-    html += escapeHtml(text.slice(pos, end));
-    pos = end;
+  let ti = firstEndingAfter(tokens, from, 'end');
+  const emit = (to) => {
+    while (pos < to) {
+      while (ti < tokens.length && tokens[ti].end <= pos) ti++;
+      const t = tokens[ti];
+      if (!t || t.start >= to) {
+        html += escapeHtml(text.slice(pos, to));
+        pos = to;
+        return;
+      }
+      if (t.start > pos) {
+        html += escapeHtml(text.slice(pos, t.start));
+        pos = t.start;
+      }
+      const end = Math.min(t.end, to);
+      html += `<span class="t-${t.type}">${escapeHtml(text.slice(pos, end))}</span>`;
+      pos = end;
+    }
   };
-  for (const m of marks) {
-    if (m.to <= from) continue;
+  for (let mi = firstEndingAfter(marks, from, 'to'); mi < marks.length; mi++) {
+    const m = marks[mi];
     if (m.from >= to) break;
     emit(Math.max(m.from, from));
     const cls = m.index === current ? `${m.cls} current` : m.cls;
@@ -235,7 +357,7 @@ function renderTree(pane) {
     pane.treeBox.replaceChildren();
     const msg = document.createElement('p');
     msg.className = 'tree-empty';
-    msg.textContent = pane.error ? 'Invalid JSON. Switch to Text to fix it.' : 'Empty';
+    msg.textContent = pane.error ? 'Invalid JSON. Switch to Text to fix it, or use Repair.' : 'Empty';
     pane.treeBox.append(msg);
     return;
   }
@@ -264,8 +386,10 @@ function renderPane(pane) {
       const last = lineOf(starts, Math.max(m.from, m.to - 1));
       for (let l = lineOf(starts, m.from); l <= last; l++) lineCls[l] = m.cls;
     }
+    pane.tokens = tokenize(text);
     pane.marks = marks;
     pane.lineCls = lineCls;
+    pane.wrapped = false;
   } else {
     renderTree(pane);
   }
@@ -286,6 +410,7 @@ function renderPane(pane) {
 
 function renderSummary() {
   const { left, right } = panes;
+  const ok = !left.error && !right.error && left.root && right.root;
   ui.summary.classList.remove('same');
   if (left.error || right.error) {
     ui.summary.textContent = 'Fix the invalid JSON to compare';
@@ -302,6 +427,11 @@ function renderSummary() {
   ui.position.textContent = diffs.length ? `${current + 1} / ${diffs.length}` : '0 / 0';
   ui.path.textContent = current >= 0 ? `${diffs[current].kind}: ${formatPath(diffs[current].path)}` : '';
   ui.prev.disabled = ui.next.disabled = diffs.length === 0;
+  // A patch needs positions, which an order-insensitive comparison does not keep.
+  ui.patch.disabled = !ok || ui.ignoreOrder.checked;
+  ui.patch.title = ui.ignoreOrder.checked
+    ? 'Not available while array order is ignored'
+    : 'Copy a JSON Patch (RFC 6902) that turns Original into Modified';
 }
 
 function render() {
@@ -314,14 +444,17 @@ function compare() {
   parsePane(panes.left);
   parsePane(panes.right);
   const ok = !panes.left.error && !panes.right.error;
-  diffs = ok ? diff(panes.left.root, panes.right.root) : [];
+  const options = { ignoreKeys: ui.ignoreKeys.value.split(','), ignoreArrayOrder: ui.ignoreOrder.checked };
+  diffs = ok ? diff(panes.left.root, panes.right.root, options) : [];
   current = Math.min(current, diffs.length - 1);
   render();
 }
 
 function scrollToOffset(pane, offset) {
   const line = lineOf(pane.starts, offset);
-  pane.textarea.scrollTop = Math.max(0, line * LINE_HEIGHT - pane.textarea.clientHeight / 3);
+  const row = wrap && pane.backdrop.children[line];
+  const top = row ? row.offsetTop : line * LINE_HEIGHT;
+  pane.textarea.scrollTop = Math.max(0, top - pane.textarea.clientHeight / 3);
 }
 
 function goTo(index) {
@@ -330,6 +463,8 @@ function goTo(index) {
   const d = diffs[current];
   for (const pane of [panes.left, panes.right]) {
     if (pane.mode === 'text') {
+      pane.wrapped = false;
+      syncScroll(pane);
       scrollToOffset(pane, d[pane.side].from);
       syncScroll(pane);
     } else {
@@ -337,6 +472,39 @@ function goTo(index) {
     }
   }
   renderSummary();
+}
+
+function setWrap(on) {
+  wrap = on;
+  for (const pane of [panes.left, panes.right]) {
+    pane.editor.classList.toggle('wrap', on);
+    pane.textarea.wrap = on ? 'soft' : 'off';
+    pane.wrapped = false;
+    syncScroll(pane);
+  }
+}
+
+function download(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function copyPatch() {
+  compare();
+  if (ui.patch.disabled) return;
+  const text = format(toPatch(diffs, panes.right.text), indentUnit());
+  const ops = `${diffs.length} operation${diffs.length === 1 ? '' : 's'}`;
+  const note = ui.ignoreKeys.value.trim() ? ' Ignored keys are left out.' : '';
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(`JSON Patch copied (${ops}).${note}`);
+  } catch {
+    download('patch.json', text);
+    toast(`Clipboard unavailable, saved patch.json (${ops}).${note}`);
+  }
 }
 
 // Share links carry both documents deflate-compressed in the URL fragment, which is never sent to a server.
@@ -396,13 +564,21 @@ async function loadShared() {
 ui.prev.addEventListener('click', () => goTo(current - 1));
 ui.next.addEventListener('click', () => goTo(current + 1));
 ui.share.addEventListener('click', share);
-try {
-  const saved = localStorage.getItem('indent');
-  if (saved) ui.indent.value = saved;
-} catch {}
-ui.indent.addEventListener('change', () => {
-  try { localStorage.setItem('indent', ui.indent.value); } catch {}
+ui.patch.addEventListener('click', copyPatch);
+ui.ignoreOrder.addEventListener('change', compare);
+ui.ignoreKeys.addEventListener('input', schedule);
+
+if (stored('indent')) ui.indent.value = stored('indent');
+ui.indent.addEventListener('change', () => store('indent', ui.indent.value));
+ui.wrap.checked = stored('wrap') === '1';
+ui.wrap.addEventListener('change', () => {
+  store('wrap', ui.wrap.checked ? '1' : '0');
+  setWrap(ui.wrap.checked);
 });
+
+// A file dropped outside the editors must not replace the page.
+window.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+window.addEventListener('drop', (e) => { if (hasFiles(e)) e.preventDefault(); });
 window.addEventListener('resize', () => { syncScroll(panes.left); syncScroll(panes.right); });
 document.addEventListener('keydown', (e) => {
   if (!e.altKey) return;
@@ -420,6 +596,7 @@ loadShared().then((shared) => {
     panes.left.textarea.value = JSON.stringify(EXAMPLE_LEFT, null, 2);
     panes.right.textarea.value = JSON.stringify(EXAMPLE_RIGHT, null, 2);
   }
+  setWrap(ui.wrap.checked);
   compare();
 });
 })();

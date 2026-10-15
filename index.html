@@ -18,6 +18,7 @@
         <option value="tab">Tab</option>
       </select>
     </label>
+    <label class="wrap-toggle"><input type="checkbox" id="wrap"> Wrap</label>
     <button type="button" id="share" class="share" title="Copy a link that contains both documents">Share</button>
   </header>
 
@@ -29,9 +30,12 @@
           <button type="button" data-mode="text" aria-pressed="true">Text</button>
           <button type="button" data-mode="tree" aria-pressed="false">Tree</button>
         </div>
+        <button type="button" class="tool" data-action="open" title="Open a file, or drop one onto this pane">Open</button>
+        <input type="file" accept=".json,application/json,text/plain" hidden>
         <span class="text-tools">
           <button type="button" class="tool" data-action="format" title="Format (Shift+Alt+F)">Format</button>
           <button type="button" class="tool" data-action="minify" title="Remove all whitespace">Minify</button>
+          <button type="button" class="tool" data-action="repair" title="Fix common mistakes and format">Repair</button>
         </span>
         <span class="tree-tools" hidden>
           <button type="button" class="tool" data-action="expand" title="Expand all">Expand</button>
@@ -62,6 +66,14 @@
         <li><i class="swatch added"></i>Added</li>
         <li><i class="swatch changed"></i>Changed</li>
       </ul>
+      <div class="options">
+        <label class="check"><input type="checkbox" id="ignore-order"> Ignore array order</label>
+        <label class="field">Ignore keys
+          <input type="text" id="ignore-keys" placeholder="id, $.meta.time" spellcheck="false"
+            title="Comma-separated. A name matches that key anywhere; a path like $.items[*].id matches one place.">
+        </label>
+        <button type="button" class="tool" id="patch" title="Copy a JSON Patch (RFC 6902) that turns Original into Modified">Copy JSON Patch</button>
+      </div>
     </aside>
 
     <section class="pane" data-side="right">
@@ -71,9 +83,12 @@
           <button type="button" data-mode="text" aria-pressed="true">Text</button>
           <button type="button" data-mode="tree" aria-pressed="false">Tree</button>
         </div>
+        <button type="button" class="tool" data-action="open" title="Open a file, or drop one onto this pane">Open</button>
+        <input type="file" accept=".json,application/json,text/plain" hidden>
         <span class="text-tools">
           <button type="button" class="tool" data-action="format" title="Format (Shift+Alt+F)">Format</button>
           <button type="button" class="tool" data-action="minify" title="Remove all whitespace">Minify</button>
+          <button type="button" class="tool" data-action="repair" title="Fix common mistakes and format">Repair</button>
         </span>
         <span class="tree-tools" hidden>
           <button type="button" class="tool" data-action="expand" title="Expand all">Expand</button>
@@ -95,6 +110,7 @@
   <div class="toast" id="toast" role="status" hidden></div>
 
   <script src="diff.js"></script>
+  <script src="text-tools.js"></script>
   <script src="tree.js"></script>
   <script src="app.js"></script>
 </body>

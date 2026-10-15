@@ -15,9 +15,15 @@
   --changed: rgba(212, 167, 44, 0.3);
   --changed-strong: #bf8700;
   --error: rgba(207, 34, 46, 0.45);
+  --tok-key: #0550ae;
+  --tok-str: #0a3069;
+  --tok-num: #953800;
+  --tok-lit: #8250df;
+  --tok-punc: #656d76;
   --line: 20px;
   --pad: 8px;
   --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  --gutter-w: 44px;
   color-scheme: light;
 }
 
@@ -39,7 +45,12 @@
     --changed: rgba(210, 153, 34, 0.3);
     --changed-strong: #d29922;
     --error: rgba(248, 81, 73, 0.5);
-              color-scheme: dark;
+    --tok-key: #79c0ff;
+    --tok-str: #a5d6ff;
+    --tok-num: #ffa657;
+    --tok-lit: #d2a8ff;
+    --tok-punc: #8d96a0;
+    color-scheme: dark;
   }
 }
 
@@ -78,6 +89,7 @@ body {
   font: inherit;
 }
 .indent option { background: var(--surface); color: var(--text); }
+.wrap-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
 .share {
   padding: 4px 14px;
   border: 1px solid rgba(255, 255, 255, 0.35);
@@ -108,6 +120,7 @@ body {
   border-radius: 6px;
   overflow: hidden;
 }
+.pane.drop { outline: 2px dashed var(--accent); outline-offset: -2px; }
 
 .pane-head {
   display: flex;
@@ -168,10 +181,10 @@ body {
 .backdrop-inner {
   padding: var(--pad);
   white-space: pre;
-  color: transparent;
+  color: var(--text);
   will-change: transform;
 }
-.backdrop-inner mark { color: transparent; border-radius: 2px; }
+.backdrop-inner mark { color: inherit; border-radius: 2px; }
 .backdrop-inner mark.added { background: var(--added); }
 .backdrop-inner mark.removed { background: var(--removed); }
 .backdrop-inner mark.changed { background: var(--changed); }
@@ -191,7 +204,7 @@ textarea {
   white-space: pre;
   overflow: auto;
   background: transparent;
-  color: var(--text);
+  color: transparent;
   caret-color: var(--text);
 }
 
@@ -228,13 +241,68 @@ textarea {
   word-break: break-all;
 }
 .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; color: var(--muted); }
+.options {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  font-size: 12px;
+}
+.options .check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.options .field { display: grid; gap: 4px; color: var(--muted); }
+.options .field input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.options .tool { padding: 4px 8px; }
+.options .tool:disabled { opacity: 0.5; cursor: default; color: var(--muted); }
 .legend li { display: flex; align-items: center; gap: 6px; }
 .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
 .swatch.added { background: var(--added-strong); }
 .swatch.removed { background: var(--removed-strong); }
 .swatch.changed { background: var(--changed-strong); }
 
-.tree .muted { color: var(--muted); }
+textarea::selection { background: rgba(59, 111, 212, 0.3); }
+
+/* Wrap mode: the gutter column is drawn inside the editor so line numbers can follow wrapped lines. */
+.editor.wrap .gutter { display: none; }
+.editor.wrap .backdrop {
+  background: linear-gradient(to right,
+    var(--gutter-bg) var(--gutter-w), var(--border) var(--gutter-w) calc(var(--gutter-w) + 1px), transparent 0);
+}
+.editor.wrap textarea, .editor.wrap .backdrop-inner {
+  padding-left: calc(var(--gutter-w) + 1px + var(--pad));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.editor.wrap textarea { overflow-x: hidden; }
+.ln { position: relative; min-height: var(--line); }
+.ln::before {
+  content: attr(data-n);
+  position: absolute;
+  left: calc(-1px - var(--pad) - var(--gutter-w));
+  width: var(--gutter-w);
+  padding-right: 8px;
+  text-align: right;
+  color: var(--muted);
+}
+.ln.added::before { box-shadow: inset 3px 0 var(--added-strong); }
+.ln.removed::before { box-shadow: inset 3px 0 var(--removed-strong); }
+.ln.changed::before { box-shadow: inset 3px 0 var(--changed-strong); }
+
+.t-key { color: var(--tok-key); }
+.t-str { color: var(--tok-str); }
+.t-num { color: var(--tok-num); }
+.t-lit { color: var(--tok-lit); }
+.t-punc, .t-index, .count { color: var(--tok-punc); }
 
 .tree {
   flex: 1;
@@ -297,4 +365,5 @@ textarea {
   .middle { flex-direction: row; flex-wrap: wrap; justify-content: center; padding: 4px 0; }
   .current-path { flex-basis: 100%; }
   .legend { display: flex; gap: 12px; }
+  .options { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); align-items: end; }
 }
