@@ -1,5 +1,5 @@
 (function () {
-const { parse, diff, formatPath } = globalThis.JsonDiff;
+const { parse, diff, format, formatPath } = globalThis.JsonDiff;
 const { createTree } = globalThis.JsonTree;
 
 const LINE_HEIGHT = 20;
@@ -32,6 +32,7 @@ const ui = {
   prev: document.getElementById('prev'),
   next: document.getElementById('next'),
   share: document.getElementById('share'),
+  indent: document.getElementById('indent'),
   toast: document.getElementById('toast'),
 };
 
@@ -50,6 +51,7 @@ function setupPane(side) {
     backdrop: root.querySelector('.backdrop-inner'),
     gutter: root.querySelector('.gutter-inner'),
     treeBox: root.querySelector('.tree'),
+    textTools: root.querySelector('.text-tools'),
     treeTools: root.querySelector('.tree-tools'),
     modeButtons: root.querySelectorAll('[data-mode]'),
     status: root.querySelector('[data-role="status"]'),
@@ -66,6 +68,8 @@ function setupPane(side) {
   pane.modeButtons.forEach((b) => b.addEventListener('click', () => setMode(pane, b.dataset.mode)));
   root.querySelector('[data-action="expand"]').addEventListener('click', () => pane.tree && pane.tree.setAll(true));
   root.querySelector('[data-action="collapse"]').addEventListener('click', () => pane.tree && pane.tree.setAll(false));
+  root.querySelector('[data-action="format"]').addEventListener('click', () => reformat(pane, indentUnit()));
+  root.querySelector('[data-action="minify"]').addEventListener('click', () => reformat(pane, ''));
   return pane;
 }
 
@@ -80,9 +84,32 @@ function schedule() {
 function setMode(pane, mode) {
   pane.mode = mode;
   pane.modeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
-  pane.editor.hidden = mode !== 'text';
+  pane.editor.hidden = pane.textTools.hidden = mode !== 'text';
   pane.treeBox.hidden = pane.treeTools.hidden = mode !== 'tree';
   renderPane(pane);
+}
+
+const indentUnit = () => (ui.indent.value === 'tab' ? '\t' : ' '.repeat(Number(ui.indent.value)));
+
+function reformat(pane, indent) {
+  const ta = pane.textarea;
+  try {
+    if (!parse(ta.value)) return;
+  } catch {
+    toast('Fix the invalid JSON before formatting');
+    return;
+  }
+  const text = format(ta.value, indent);
+  if (text === ta.value) return;
+  // insertText keeps the change on the native undo stack; fall back to a plain assignment where it is unsupported.
+  ta.focus();
+  ta.select();
+  if (!document.execCommand('insertText', false, text)) {
+    ta.value = text;
+    ta.dispatchEvent(new Event('input'));
+  }
+  ta.setSelectionRange(0, 0);
+  ta.scrollTop = ta.scrollLeft = 0;
 }
 
 let toastTimer = 0;
@@ -369,9 +396,21 @@ async function loadShared() {
 ui.prev.addEventListener('click', () => goTo(current - 1));
 ui.next.addEventListener('click', () => goTo(current + 1));
 ui.share.addEventListener('click', share);
+try {
+  const saved = localStorage.getItem('indent');
+  if (saved) ui.indent.value = saved;
+} catch {}
+ui.indent.addEventListener('change', () => {
+  try { localStorage.setItem('indent', ui.indent.value); } catch {}
+});
 window.addEventListener('resize', () => { syncScroll(panes.left); syncScroll(panes.right); });
 document.addEventListener('keydown', (e) => {
   if (!e.altKey) return;
+  if (e.shiftKey && e.code === 'KeyF') {
+    const pane = [panes.left, panes.right].find((p) => p.textarea === document.activeElement);
+    if (pane) { e.preventDefault(); reformat(pane, indentUnit()); }
+    return;
+  }
   if (e.key === 'ArrowDown') { e.preventDefault(); goTo(current + 1); }
   if (e.key === 'ArrowUp') { e.preventDefault(); goTo(current - 1); }
 });

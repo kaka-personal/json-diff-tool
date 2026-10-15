@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../diff.js';
 
-const { parse, diff, formatPath } = globalThis.JsonDiff;
+const { parse, diff, format, formatPath } = globalThis.JsonDiff;
 
 const run = (a, b) => diff(parse(a), parse(b)).map((d) => `${d.kind} ${formatPath(d.path)}`);
 
@@ -63,4 +63,26 @@ test('diff slots point at source ranges', () => {
 
 test('formatPath quotes non-identifier keys', () => {
   assert.equal(formatPath(['a', 0, 'b-c']), '$.a[0]["b-c"]');
+});
+
+test('format indents nested values and keeps empty containers inline', () => {
+  assert.equal(format('{"a":[1,{"b":null}],"c":{},"d":[ ]}', '  '),
+    '{\n  "a": [\n    1,\n    {\n      "b": null\n    }\n  ],\n  "c": {},\n  "d": []\n}');
+  assert.equal(format('[1,2]', '\t'), '[\n\t1,\n\t2\n]');
+});
+
+test('format with an empty indent minifies', () => {
+  assert.equal(format('{\n  "a" : [ 1 , 2 ],\n  "b": { }\n}', ''), '{"a":[1,2],"b":{}}');
+});
+
+test('format leaves strings, numbers and duplicate keys untouched', () => {
+  const text = '{"s":"a, b: {c} [d] \\" \\u00e9","n":12345678901234567890,"n":1.50e+3}';
+  assert.equal(format(text, ''), text);
+  assert.equal(format(format(text, '    '), ''), text);
+});
+
+test('formatted output parses to the same value', () => {
+  const text = '{"a":[true,false,null,-0.5,"x\\ny"],"b":{"c":[[],[{}]]}}';
+  assert.deepEqual(JSON.parse(format(text, '  ')), JSON.parse(text));
+  assert.equal(format(text, ''), text);
 });

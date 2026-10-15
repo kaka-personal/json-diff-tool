@@ -1,4 +1,4 @@
-// JSON parser that keeps source offsets, plus a structural diff between two parsed trees.
+// JSON parser that keeps source offsets, a whitespace-only formatter, and a structural diff between two parsed trees.
 // Plain script (no ES module) so the page also works when opened from file://.
 (function () {
 
@@ -233,5 +233,41 @@ function diff(leftRoot, rightRoot) {
   return out;
 }
 
-globalThis.JsonDiff = { parse, diff, formatPath };
+// Re-indents valid JSON by rewriting whitespace only, so numbers, escapes and duplicate keys stay exactly as written.
+// An empty indent produces minified output.
+function format(text, indent) {
+  const nl = (depth) => (indent ? '\n' + indent.repeat(depth) : '');
+  const isWs = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r';
+  let out = '';
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '"') {
+      STRING_RE.lastIndex = i;
+      const s = STRING_RE.exec(text)[0];
+      out += s;
+      i += s.length - 1;
+    } else if (c === '{' || c === '[') {
+      let j = i + 1;
+      while (isWs(text[j])) j++;
+      if (text[j] === (c === '{' ? '}' : ']')) {
+        out += c + text[j];
+        i = j;
+      } else {
+        out += c + nl(++depth);
+      }
+    } else if (c === '}' || c === ']') {
+      out += nl(--depth) + c;
+    } else if (c === ',') {
+      out += ',' + nl(depth);
+    } else if (c === ':') {
+      out += indent ? ': ' : ':';
+    } else if (!isWs(c)) {
+      out += c;
+    }
+  }
+  return out;
+}
+
+globalThis.JsonDiff = { parse, diff, format, formatPath };
 })();

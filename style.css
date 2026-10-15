@@ -67,8 +67,18 @@ body {
 }
 .topbar h1 { margin: 0; font-size: 17px; font-weight: 600; }
 .tagline { font-size: 12px; opacity: 0.7; }
+.indent { margin-left: auto; font-size: 13px; }
+.indent select {
+  margin-left: 6px;
+  padding: 3px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--topbar-text);
+  font: inherit;
+}
+.indent option { background: var(--surface); color: var(--text); }
 .share {
-  margin-left: auto;
   padding: 4px 14px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 6px;
@@ -126,7 +136,7 @@ body {
 .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 .tool { border: 1px solid var(--border); border-radius: 6px; }
 .tool:hover, .seg button[aria-pressed="false"]:hover { color: var(--accent); }
-.tree-tools { display: inline-flex; gap: 4px; }
+.text-tools, .tree-tools { display: inline-flex; gap: 4px; }
 
 .editor { flex: 1; min-height: 0; display: flex; }
 

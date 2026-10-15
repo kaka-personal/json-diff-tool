@@ -11,6 +11,13 @@
   <header class="topbar">
     <h1>JSON Diff Tool</h1>
     <span class="tagline">Everything runs in your browser. Nothing is uploaded.</span>
+    <label class="indent">Indent
+      <select id="indent">
+        <option value="2">2 spaces</option>
+        <option value="4">4 spaces</option>
+        <option value="tab">Tab</option>
+      </select>
+    </label>
     <button type="button" id="share" class="share" title="Copy a link that contains both documents">Share</button>
   </header>
 
@@ -22,6 +29,10 @@
           <button type="button" data-mode="text" aria-pressed="true">Text</button>
           <button type="button" data-mode="tree" aria-pressed="false">Tree</button>
         </div>
+        <span class="text-tools">
+          <button type="button" class="tool" data-action="format" title="Format (Shift+Alt+F)">Format</button>
+          <button type="button" class="tool" data-action="minify" title="Remove all whitespace">Minify</button>
+        </span>
         <span class="tree-tools" hidden>
           <button type="button" class="tool" data-action="expand" title="Expand all">Expand</button>
           <button type="button" class="tool" data-action="collapse" title="Collapse all">Collapse</button>
@@ -60,6 +71,10 @@
           <button type="button" data-mode="text" aria-pressed="true">Text</button>
           <button type="button" data-mode="tree" aria-pressed="false">Tree</button>
         </div>
+        <span class="text-tools">
+          <button type="button" class="tool" data-action="format" title="Format (Shift+Alt+F)">Format</button>
+          <button type="button" class="tool" data-action="minify" title="Remove all whitespace">Minify</button>
+        </span>
         <span class="tree-tools" hidden>
           <button type="button" class="tool" data-action="expand" title="Expand all">Expand</button>
           <button type="button" class="tool" data-action="collapse" title="Collapse all">Collapse</button>
