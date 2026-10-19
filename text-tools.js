@@ -201,5 +201,16 @@ function repair(text) {
   return { ok: true, text: JSON.stringify(value, null, 2) };
 }
 
-globalThis.JsonText = { tokenize, repair };
+// Decodes an escaped JSON string, with or without its surrounding quotes.
+// Returns { ok: true, text } with the decoded content, or { ok: false }.
+function unescape(text) {
+  const s = text.trim();
+  try {
+    const value = JSON.parse(s.startsWith('"') ? s : `"${s}"`);
+    if (typeof value === 'string') return { ok: true, text: value };
+  } catch { /* not an escaped string */ }
+  return { ok: false };
+}
+
+globalThis.JsonText = { tokenize, repair, unescape };
 })();

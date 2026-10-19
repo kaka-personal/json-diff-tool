@@ -2,7 +2,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../text-tools.js';
 
-const { tokenize, repair } = globalThis.JsonText;
+const { tokenize, repair, unescape } = globalThis.JsonText;
+
+test('unescape decodes strings with or without surrounding quotes', () => {
+  assert.deepEqual(unescape(' "{\\"a\\":[1,\\"x\\\\ny\\"]}" '), { ok: true, text: '{"a":[1,"x\\ny"]}' });
+  assert.deepEqual(unescape('{\\"a\\":\\"\\u00e9\\"}'), { ok: true, text: '{"a":"é"}' });
+  assert.deepEqual(unescape(JSON.stringify('{"n":12345678901234567890}')), { ok: true, text: '{"n":12345678901234567890}' });
+});
+
+test('unescape rejects text that is not an escaped string', () => {
+  assert.deepEqual(unescape('{"a":1}'), { ok: false });
+  assert.deepEqual(unescape('"a" "b"'), { ok: false });
+  assert.deepEqual(unescape('bad \\q escape'), { ok: false });
+});
 
 const fixed = (text) => {
   const r = repair(text);

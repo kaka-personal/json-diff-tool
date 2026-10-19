@@ -1,6 +1,6 @@
 (function () {
 const { parse, diff, format, formatPath, toPatch } = globalThis.JsonDiff;
-const { tokenize, repair } = globalThis.JsonText;
+const { tokenize, repair, unescape } = globalThis.JsonText;
 const { createTree } = globalThis.JsonTree;
 
 const LINE_HEIGHT = 20;
@@ -80,6 +80,8 @@ function setupPane(side) {
   root.querySelector('[data-action="collapse"]').addEventListener('click', () => pane.tree && pane.tree.setAll(false));
   root.querySelector('[data-action="format"]').addEventListener('click', () => reformat(pane, indentUnit()));
   root.querySelector('[data-action="minify"]').addEventListener('click', () => reformat(pane, ''));
+  root.querySelector('[data-action="escape"]').addEventListener('click', () => escapePane(pane));
+  root.querySelector('[data-action="unescape"]').addEventListener('click', () => unescapePane(pane));
   root.querySelector('[data-action="repair"]').addEventListener('click', () => repairPane(pane));
 
   const fileInput = root.querySelector('input[type="file"]');
@@ -158,6 +160,31 @@ function reformat(pane, indent) {
   }
   const text = format(ta.value, indent);
   if (text !== ta.value) replaceText(pane, text);
+}
+
+// Valid JSON is minified first so the escaped string stays on one line; other text is escaped as it is.
+function escapePane(pane) {
+  const text = pane.textarea.value;
+  if (!text.trim()) return;
+  let source = text;
+  try {
+    if (parse(text)) source = format(text, '');
+  } catch { /* not JSON */ }
+  replaceText(pane, JSON.stringify(source));
+}
+
+// The decoded content is formatted when it is JSON, otherwise inserted as it is.
+function unescapePane(pane) {
+  const result = unescape(pane.textarea.value);
+  if (!result.ok) {
+    toast('Not an escaped JSON string');
+    return;
+  }
+  let text = result.text;
+  try {
+    if (parse(text)) text = format(text, indentUnit());
+  } catch { /* plain text */ }
+  replaceText(pane, text);
 }
 
 function repairPane(pane) {

@@ -13,6 +13,7 @@ and you can step through every difference. Everything runs in the browser; nothi
 - Copy the differences as an RFC 6902 JSON Patch that turns the original into the modified document
 - Share links: both documents are compressed into the URL fragment, which is never sent to a server
 - Format or minify either side with 2 spaces, 4 spaces or tabs; only whitespace is rewritten, so big numbers and escapes stay as written
+- Escape the content into a JSON string, or unescape one (with or without its quotes) back into formatted JSON
 - Repair: fixes single quotes, unquoted keys, trailing commas, comments, Python/JS literals,
   missing commas, truncated documents, JSONP/function wrappers, escaped JSON strings and NDJSON
 - Syntax errors are reported with line and column
