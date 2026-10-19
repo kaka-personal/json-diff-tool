@@ -453,6 +453,7 @@ function renderSummary() {
   }
   ui.position.textContent = diffs.length ? `${current + 1} / ${diffs.length}` : '0 / 0';
   ui.path.textContent = current >= 0 ? `${diffs[current].kind}: ${formatPath(diffs[current].path)}` : '';
+  ui.path.title = ui.path.textContent;
   ui.prev.disabled = ui.next.disabled = diffs.length === 0;
   // A patch needs positions, which an order-insensitive comparison does not keep.
   ui.patch.disabled = !ok || ui.ignoreOrder.checked;
