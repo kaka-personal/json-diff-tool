@@ -6,7 +6,7 @@ const STRING_RE = /"(?:[^"\\\u0000-\u001f]|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4}))*"/
 const NUMBER_RE = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
 
 // Returns null for blank input, otherwise the root node.
-// Node: { type, start, end, value?, items?, members? }
+// Node: { type, start, end, value?, raw?, items?, members? } (raw: a number's source text)
 // Object members: [{ key, keyStart, node }] (duplicate keys: last one wins, like JSON.parse).
 function parse(text) {
   let i = 0;
@@ -61,7 +61,7 @@ function parse(text) {
       const m = NUMBER_RE.exec(text);
       if (!m) fail('Invalid number');
       i += m[0].length;
-      return { type: 'number', value: Number(m[0]), start, end: i };
+      return { type: 'number', value: Number(m[0]), raw: m[0], start, end: i };
     }
     fail(c === undefined ? 'Unexpected end of input' : `Unexpected token '${c}'`);
   }
@@ -159,6 +159,18 @@ function lcsPairs(a, b) {
   return pairs;
 }
 
+// Exact value of a JSON number literal as "<sign><digits>e<exponent>" with no leading or trailing zeros in digits,
+// so 1, 1.0 and 1e0 are equal while numbers beyond double precision stay distinct.
+function exactNumber(raw) {
+  const m = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(raw);
+  const fraction = m[3] || '';
+  const digits = (m[2] + fraction).replace(/^0+/, '');
+  if (!digits) return '0';
+  const trimmed = digits.replace(/0+$/, '');
+  const exp = Number(m[4] || 0) - fraction.length + digits.length - trimmed.length;
+  return `${m[1]}${trimmed}e${exp}`;
+}
+
 // A "slot" is a node plus where its highlight starts (the key for object members).
 const slot = (node, from = node.start) => ({ node, from, to: node.end });
 
@@ -200,6 +212,8 @@ function diff(leftRoot, rightRoot, options = {}) {
     } else if (node.type === 'array') {
       const parts = node.items.map((item) => canon(item, pp + '[*]'));
       s = '[' + (unordered ? parts.sort() : parts).join(',') + ']';
+    } else if (node.type === 'number') {
+      s = exactNumber(node.raw);
     } else {
       s = JSON.stringify(node.value);
     }

@@ -85,6 +85,13 @@ test('diff slots point at source ranges', () => {
   assert.equal(right.slice(added.right.from, added.right.to), '"c": 3');
 });
 
+test('numbers compare by exact value, not as doubles', () => {
+  assert.deepEqual(run('{"big":12345678901234567890}', '{"big":12345678901234567891}'), ['changed $.big']);
+  assert.deepEqual(run('[0.1000000000000000000001]', '[0.1]'), ['changed $[0]']);
+  assert.deepEqual(run('[1, 1.0, 1e0, 10E-1, 100, 0.0, -0, -0.50]', '[1.00, 1, 1, 1, 1e2, 0, 0, -5e-1]'), []);
+  assert.deepEqual(run('[1, 2]', '[1.0, 20e-1, 3]'), ['added $[2]']);
+});
+
 test('ignored key names are skipped at any depth', () => {
   const opts = { ignoreKeys: ['ts'] };
   assert.deepEqual(run('{"ts":1,"a":{"ts":2,"b":1}}', '{"ts":9,"a":{"ts":8,"b":2},"c":{"ts":0}}', opts), [

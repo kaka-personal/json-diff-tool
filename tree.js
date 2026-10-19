@@ -10,6 +10,7 @@ function el(tag, cls, text) {
 }
 
 function valueText(node) {
+  if (node.type === 'number') return node.raw;
   return node.type === 'string' ? JSON.stringify(node.value) : String(node.value);
 }
 
